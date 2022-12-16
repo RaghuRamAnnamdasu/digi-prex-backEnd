@@ -17,8 +17,6 @@ async function genHashedPassword(password){
 
 router.post('/signup', async function (req, res) {
     const {email,password,userName} = req.body[0];
-    console.log(req.body);
-    console.log(email,password,userName);
     const userFromDB = await getUserByName(email);
 
       if(userFromDB){
@@ -29,12 +27,10 @@ router.post('/signup', async function (req, res) {
         if(email === "admin@gmail.com"){
           const hashedPassword = await genHashedPassword(password);
           const result = await createUSer({email : email , password : hashedPassword, userName: userName, type : "admin"});
-          console.log(hashedPassword);
           res.send(result);
         }else{
           const hashedPassword = await genHashedPassword(password);
           const result = await createUSer({email : email , password : hashedPassword, userName: userName, type : "user", cart: [], orderedItems:[], notificationArray:[]});
-          console.log(hashedPassword);
           res.send(result);
         }
       }
@@ -46,12 +42,10 @@ router.post('/signup', async function (req, res) {
     
       const {email,password} = req.body[0];
       const userFromDB = await getUserByName(email);
-    //   console.log(userFromDB);
       var passwordMatch;
       if(userFromDB){
         const storedPassword = userFromDB.password;
         passwordMatch = await bcrypt.compare(password,storedPassword);
-        // console.log(passwordMatch);
       }
     
 
@@ -64,22 +58,18 @@ router.post('/signup', async function (req, res) {
         res.send({"message" : "Successful Login", token : token, name: userFromDB.userName, id: userFromDB._id, email: userFromDB.email, 
         type: userFromDB.type, cart: userFromDB.cart, orderedItems: userFromDB.orderedItems, 
         notificationArray: userFromDB.notificationArray });
-        // console.log(res.name,req.body[0]);
       }
   })    
 
 
 
   router.post('/forgotpassword', async function(req, res) {
-    // console.log("entered in to forgotpassword route")
     const {email} = req.body[0];
     const userFromDB = await getUserByName(email);
-    console.log(userFromDB);
 
       if(!userFromDB){
         res.status(401).send({"message" : "Email does not exists"});
       }else{
-      //  const secret = process.env.secretKey + userFromDB.password;
         const secret = process.env.secretKey;
         const payload = {
             email : userFromDB.email,
@@ -87,10 +77,8 @@ router.post('/signup', async function (req, res) {
         }
         const token = jwt.sign(payload,secret,{expiresIn: '15m'});
         const link = `${process.env.frontEndUrl}/reset-password/${userFromDB._id}/${token}`;
-        // console.log(link);
         mailer(email,link);
         const result = await client.db("digi-prex-shopping").collection("users").updateOne({email : email},{$set : {resetToken : token}});
-        // console.log(result);
         res.send({"message" : "Password rest link has sent to your mail", result});
       }
   })
@@ -99,9 +87,7 @@ router.post('/signup', async function (req, res) {
   router.post("/resetPassword", async function(req,res){
     
     const {id, password, token} = req.body[0];
-    // console.log(req.body[0],id, password, token);
     const userDetails = await client.db("digi-prex-shopping").collection("users").find({_id : ObjectId(id)}).toArray();
-    // console.log(userDetails);
     const resetToken = userDetails[0].resetToken;
 
     jwt.verify(token,process.env.secretKey,async function(err,decodedData){
@@ -110,7 +96,6 @@ router.post('/signup', async function (req, res) {
         return res.status(401).send({message : "Authentication Error or Link expired"});
       }else if(token === resetToken){
         const hashedPassword = await genHashedPassword(password);
-        console.log("hashedPassword", hashedPassword)
         const result = await client.db("digi-prex-shopping").collection("users").updateOne({_id : ObjectId(id)},{$set : {password : hashedPassword}});
         res.send({message : "Successful Reset", result});
       }else{
@@ -118,6 +103,16 @@ router.post('/signup', async function (req, res) {
       }
     });
 
+  })
+
+
+  router.get("/getUserDetails/:userId", async function(req,res){
+
+    let userId = req.params.userId;
+
+    const userDetails = await client.db("digi-prex-shopping").collection("users").find({_id: ObjectId(userId)}).toArray();
+
+    res.send(userDetails[0]);
   })
 
 

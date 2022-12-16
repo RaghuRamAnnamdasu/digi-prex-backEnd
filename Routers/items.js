@@ -2,7 +2,6 @@ import { ObjectId } from "bson";
 import express from "express";
 import Stripe from "stripe";
 import { client } from "../index.js";
-import cron from "node-cron";
 import nodemailer from "nodemailer";
 import hbs from "nodemailer-express-handlebars";
 
@@ -24,7 +23,6 @@ router.get("/getAllItems", async (req,res)=>{
 router.put("/updateCartItem/:userId", async (req,res)=>{
     let cartItemsArray = req.body;
     let userId = req.params.userId;
-    // console.log(cartItemsArray, userId);
 
     const replaceCart = await client.db("digi-prex-shopping").collection("users").updateOne({_id : ObjectId(userId)},{$set:{cart : cartItemsArray}});
     res.send(replaceCart);
@@ -36,16 +34,13 @@ router.put("/updateCartItem/:userId", async (req,res)=>{
 router.get("/getCart/:userId", async (req,res)=>{
     let userId = req.params.userId;
     const userProfile = await client.db("digi-prex-shopping").collection("users").find({_id : ObjectId(userId)}).toArray();
-    // console.log("userProfile", userProfile);
     let cartItems = [];
     if(userProfile[0].cart.length === 0){
         res.send([]);
     }else{
         userProfile[0].cart && userProfile[0].cart.map(async (itemId,index)=>{
             const result = await client.db("digi-prex-shopping").collection("items").find({_id : ObjectId(itemId)}).toArray();
-            // console.log("...result",result);
             cartItems.push(result[0]);
-            // console.log("+++++++++", userProfile[0].cart, index, userProfile[0].cart.length-1, index === userProfile[0].cart.length-1);
             if(cartItems.length === userProfile[0].cart.length){
                 console.log("cartItems........",cartItems); 
                 res.send(cartItems);
@@ -61,7 +56,6 @@ router.post("/bookOrder", async (req,res)=>{
     try{
     const {token} = req.body;
     const bookedData = req.body;
-    // console.log("bookedData",bookedData);
     const customer = await stripe.customers.create({
         email: token.email,
         source: token.id
@@ -77,12 +71,9 @@ router.post("/bookOrder", async (req,res)=>{
         receipt_email : token.email
     });
 
-    // console.log("paymentIntentOutside......",paymentIntent);
 
     if(paymentIntent){
-        // console.log("paymentIntent", paymentIntent);
         req.body.transactionId = paymentIntent.id;
-        // console.log(req.body);
         const bookedDataResult = await client.db("digi-prex-shopping").collection("bookedData").insertOne(bookedData);
         const userId = bookedData.userId;
         const orderedItems = bookedData.cartItems;
@@ -98,94 +89,46 @@ router.post("/bookOrder", async (req,res)=>{
 });
 
 
-//send Notification during signOff
+//send Notification during signOff and tab close
 
-router.get("/sendNotification/:emailId", async (req,res)=>{
 
-    // console.log("I have entered", req.body);
+router.get("/sendNotification/:emailId/:userId", async (req,res)=>{
 
-    const {emailId} = req.params;
-    const link = `${process.env.frontEndUrl}/bookOrder/fromLink`;
+    const {emailId,userId} = req.params;
+    const link = `${process.env.frontEndUrl}/bookOrder/fromLink/${userId}`;
     
 
 
     async function getCartDetailsAtMoment(){
         let items=[];
-        await client.db("digi-prex-shopping").collection("users").find({email : emailId}).toArray().then((userProfile)=>{
-            if(userProfile[0].cart?.length > 0){
-                userProfile[0].cart && userProfile[0].cart.map(async (itemId,index)=>{
-                    // console.log("itemId......",itemId);
-                    const result = await client.db("digi-prex-shopping").collection("items").find({_id : ObjectId(itemId)}).toArray();
-                    // console.log("result.....",result);
-                    items.push(result[0]);
-                    if(items.length === userProfile[0].cart.length){
-                        // console.log("items inside......................",items)
-                        return items;
-                    }
-                });
-            }else{
-                return [];
-            }
-        })
-        // console.log("userProfile.......",userProfile)
-        
+        let userProfile = await client.db("digi-prex-shopping").collection("users").find({email : emailId}).toArray();
+        if(userProfile[0] && userProfile[0].cart?.length > 0){
+            userProfile[0].cart && userProfile[0].cart.map(async (itemId,index)=>{
+                const result = await client.db("digi-prex-shopping").collection("items").find({_id : ObjectId(itemId)}).toArray();
+                items.push(result[0]);
+                if(items.length === userProfile[0].cart.length){
+                    sendNotification(items);
+                }
+            });
+        }else{
+            return [];
+        }
     }
 
-
-    var task1 = cron.schedule('*/30 * * * *', async () => {
-
-        let data = await getCartDetailsAtMoment();
-
-            // console.log("hi,task-1",data);
-            if(data.length){
-                // console.log(data);
-                notificationMailer(emailId,link,data);
-            }  
-    },{
-        scheduled: false
-    });
-        
-    setTimeout(()=>task1.start(), 1800000);
-
-    setTimeout(()=>task1.stop(), 2700000);
-
-
-        
-    var task2 = cron.schedule('* */23 * * *', async () => {
-
-        let cartItems = await getCartDetailsAtMoment();
-
-        // console.log("hi,task-02",cartItems);
-        if(cartItems.length){
-            // console.log(cartItems);
-            notificationMailer(emailId,link,cartItems);
+    function sendNotification(data) {
+        console.log("entered sendNotification fn()",data);
+        if(data.length){
+            notificationMailer(emailId,link,data);
         } 
-    },{
-        scheduled: false
-    });
+    }
 
-    setTimeout(()=>task2.start(), 86400000);
-
-    setTimeout(()=>task2.stop(), 90000000);
-
+    // setTimeout(()=>getCartDetailsAtMoment(), 1000);   
     
+    setTimeout(()=>getCartDetailsAtMoment(), 1800000);
 
-    var task3 = cron.schedule('* */23 * * *', async () => {
+    setTimeout(()=>getCartDetailsAtMoment(), 86400000);
 
-        let cartItems = await getCartDetailsAtMoment();
-
-        // console.log("hi, task3",cartItems);
-        if(cartItems.length){
-            // console.log(cartItems);
-            notificationMailer(emailId,link,cartItems);
-        } 
-    },{
-        scheduled: false
-    });
-
-    setTimeout(()=>task3.start(), 259200000);
-
-    setTimeout(()=>task3.stop(), 262800000);
+    setTimeout(()=>getCartDetailsAtMoment(), 259200000);
  
 });
 
@@ -193,7 +136,6 @@ router.get("/sendNotification/:emailId", async (req,res)=>{
 
 
 function notificationMailer(email,link,itemsArray){
-    // console.log("I am inside tooo....");
     try{
         var transporter = nodemailer.createTransport({
             service: "outlook",
@@ -218,12 +160,16 @@ function notificationMailer(email,link,itemsArray){
             to: email,
             subject: "Remainder - Hey, Look in to your cart. Your Items are waiting for you...",
             text: "Hi User",
-            // html: `<div><h4>Hi User,</h4></br><p>please click the link below for password reset</p></br><a href=${link}/></br></div>`
-            // html: `please click the link to reset your password - ${link}`
             template: "index",
             context: {
                 image1 : itemsArray[0].poster,
                 name1 : itemsArray[0].name,
+                image2 : itemsArray[1]?.poster,
+                name2 : itemsArray[1]?.name,
+                image3 : itemsArray[2]?.poster,
+                name3 : itemsArray[2]?.name,
+                image4 : itemsArray[3]?.poster,
+                name4 : itemsArray[3]?.name,
                 link: link
             }
         }

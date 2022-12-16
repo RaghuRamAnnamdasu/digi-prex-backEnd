@@ -9,6 +9,10 @@
         a {
             text-decoration: none;
         }
+        img {
+            max-width: 200px;
+            max-height: 200px;
+        }
     </style>
 </head>
 
@@ -16,10 +20,22 @@
     <div>
         <h4>Hi User,</h4>
         <p>It seems that you have missed few items in your cart.</p>
-        <div><h3>{{name1}}</h3> and other items are waiting for you in the cart.</div>
+        <div>{{name1}} and other items are waiting for you in the cart.</div>
         <div>
-            <div>{{name1}}</div>
+            <h2>{{name1}}</h2>
             <img src={{image1}} alt="{{name1}}" />
+        </div>
+        <div>
+            <h2>{{name2}}</h2>
+            <img src={{image2}} alt="{{name2}}" />
+        </div>
+        <div>
+            <h2>{{name3}}</h2>
+            <img src={{image3}} alt="{{name3}}" />
+        </div>
+        <div>
+            <h2>{{name4}}</h2>
+            <img src={{image4}} alt="{{name4}}" />
         </div>
         <button id="imageButton" onclick="onClick()"><a href={{link}} targer="blank">Go To Cart</a></button>
     </div>

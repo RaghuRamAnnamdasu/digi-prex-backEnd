@@ -14,7 +14,6 @@ app.use(express.json());
 
 const port = process.env.PORT || 4000;
 
-// console.log(process.env);
 const mongo_URL = process.env.Mongo_URL;
 
 async function createConnection(){
